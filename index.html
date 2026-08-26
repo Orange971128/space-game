@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>星渊 · 宇宙进化</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI','PingFang SC',sans-serif;background:#07071a;color:#e0e0ff;overflow-x:hidden;min-height:100vh;-webkit-tap-highlight-color:transparent}
+canvas#bg{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none}
+.wrap{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:16px;display:flex;gap:16px}
+.left{flex:1;text-align:center}
+.right{width:360px;max-height:92vh;overflow-y:auto;padding-right:4px}
+.right::-webkit-scrollbar{width:6px}
+.right::-webkit-scrollbar-thumb{background:rgba(100,140,255,.3);border-radius:3px}
+h1{font-size:1.8em;background:linear-gradient(135deg,#88bbff,#ff88dd,#88ffdd);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.sub{color:#8899bb;font-size:.8em;margin-bottom:14px}
+.res{background:rgba(18,18,55,.82);border:1px solid rgba(100,140,255,.3);border-radius:14px;padding:16px;margin-bottom:14px;backdrop-filter:blur(8px)}
+.val{font-size:2.4em;font-weight:bold;color:#fff;text-shadow:0 0 18px rgba(100,180,255,.5)}
+.lbl{color:#8899cc;margin-top:4px;font-size:.9em}
+.dps{color:#66ddaa;font-size:.85em;margin-top:6px}
+.planet-wrap{position:relative;display:inline-block;margin:18px 0;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+.planet{width:140px;height:140px;border-radius:50%;transition:width .5s,height .5s,background .5s,box-shadow .5s;position:relative}
+.planet::before{content:'';position:absolute;inset:-14px;border-radius:50%;border:2px solid rgba(255,200,100,.14);animation:r1 12s linear infinite}
+.planet::after{content:'';position:absolute;inset:-24px;border-radius:50%;border:1px solid rgba(255,150,200,.1);animation:r2 20s linear infinite reverse}
+@keyframes r1{to{transform:rotate(360deg)}}@keyframes r2{to{transform:rotate(360deg)}}
+.planet-wrap:hover .planet{transform:scale(1.04)}
+.planet-wrap:active .planet{transform:scale(.96)}
+.ft{position:absolute;color:#fff;font-weight:bold;font-size:1.2em;pointer-events:none;text-shadow:0 0 6px rgba(255,200,100,.8);animation:fu 1s ease-out forwards}
+@keyframes fu{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-55px) scale(1.3)}}
+.stage{color:#aabbff;font-size:1em;margin-top:8px;text-shadow:0 0 10px rgba(100,180,255,.4)}
+.sec{font-size:1em;color:#aabbff;margin:12px 0 8px;padding-bottom:4px;border-bottom:1px solid rgba(100,140,255,.2)}
+.item{background:rgba(28,28,78,.72);border:1px solid rgba(100,140,255,.2);border-radius:10px;padding:10px;margin-bottom:7px;cursor:pointer;transition:background .2s,border-color .2s}
+.item:hover{background:rgba(48,48,118,.8);border-color:rgba(100,180,255,.5)}
+.item:active{transform:scale(.98)}
+.item.owned{border-color:rgba(100,255,150,.4)}
+.iname{font-weight:bold;color:#cceeff;font-size:.9em}
+.idesc{color:#8899bb;font-size:.78em;margin-top:2px}
+.icost{color:#ffcc66;font-size:.82em;margin-top:3px}
+.icount{color:#66ddaa;font-size:.78em;float:right}
+.mbtn{position:fixed;top:12px;right:12px;width:38px;height:38px;border-radius:50%;border:1px solid rgba(100,140,255,.4);background:rgba(18,18,55,.85);color:#aabbff;font-size:1.1em;cursor:pointer;z-index:100;display:flex;align-items:center;justify-content:center}
+.mbtn.playing{color:#66ddaa;border-color:rgba(100,255,150,.4)}
+.ach{position:fixed;bottom:18px;left:50%;transform:translateX(-50%) translateY(100px);background:rgba(18,18,55,.95);border:1px solid rgba(255,200,100,.5);border-radius:10px;padding:11px 22px;color:#ffdd88;font-size:.88em;z-index:200;transition:transform .5s;pointer-events:none;white-space:nowrap}
+.ach.show{transform:translateX(-50%) translateY(0)}
+.tip{color:#667799;font-size:.8em;margin-top:4px}
+@media(max-width:760px){.wrap{flex-direction:column}.right{width:100%;max-height:none}.planet{width:120px;height:120px}}
+</style>
+</head>
+<body>
+<canvas id="bg"></canvas>
+<button class="mbtn" id="mbtn" title="音乐开关">♪</button>
+<div class="wrap">
+  <div class="left">
+    <h1>星 渊</h1>
+    <p class="sub">Cosmic Clicker · 从陨石到黑洞</p>
+    <div class="res">
+      <div class="val" id="dust">0</div>
+      <div class="lbl">星尘</div>
+      <div class="dps" id="dps">每秒 +0</div>
+    </div>
+    <div class="planet-wrap" id="pwrap"><div class="planet" id="planet"></div></div>
+    <div class="stage" id="stage">陨石</div>
+    <p class="tip">点击星球收集星尘</p>
+  </div>
+  <div class="right">
+    <div class="sec">🏗️ 建筑（自动产星尘）</div>
+    <div id="blist"></div>
+    <div class="sec">⬆️ 升级</div>
+    <div id="ulist"></div>
+  </div>
+</div>
+<div class="ach" id="ach"></div>
+<script>
+// ===== 星空背景 =====
+(function(){
+  var c=document.getElementById('bg'),x=c.getContext('2d');
+  function resize(){c.width=innerWidth;c.height=innerHeight}
+  resize();addEventListener('resize',resize);
+  var stars=[];for(var i=0;i<160;i++)stars.push({x:Math.random(),y:Math.random(),r:Math.random()*1.6+.3,s=Math.random()*.3+.05,c:['#ffffff','#aaddff','#ffddaa','#ffaadd','#aaffff'][(Math.random()*5)|0]});
+  var ty=0;
+  (function loop(){
+    ty+=.15;x.fillStyle='#07071a';x.fillRect(0,0,c.width,c.height);
+    for(var i=0;i<stars.length;i++){var s=stars[i],y=(s.y*c.height+ty*s.s)%c.height;x.beginPath();x.arc(s.x*c.width,y,s.r,0,6.28);x.fillStyle=s.c;x.globalAlpha=.3+Math.random()*.5;x.fill()}
+    x.globalAlpha=1;requestAnimationFrame(loop);
+  })();
+})();
+// ===== 星球阶段 =====
+var stages=[
+  {n:'陨石',bg:'radial-gradient(circle at 35% 35%, #999,#555 55%, #333)',sz:72},
+  {n:'小行星',bg:'radial-gradient(circle at 35% 35%, #bbb,#777 55%, #444)',sz:92},
+  {n:'矮行星',bg:'radial-gradient(circle at 35% 35%, #d4a96a,#8a6130 55%, #523010)',sz:112},
+  {n:'卫星',bg:'radial-gradient(circle at 35% 35%, #e2e2d0,#a8a8b0 55%, #66707a)',sz:124},
+  {n:'行星',bg:'radial-gradient(circle at 35% 35%, #4a90ff,#2250b0 55%, #102a66)',sz:136,gl:'inset -14px -14px 28px rgba(0,0,0,.5),0 0 24px rgba(60,120,255,.25)'},
+  {n:'气态行星',bg:'radial-gradient(circle at 35% 35%, #ffb84a,#cc6620 55%, #882e10)',sz:156,gl:'inset -16px -16px 32px rgba(0,0,0,.5),0 0 30px rgba(255,140,40,.3)'},
+  {n:'恒星',bg:'radial-gradient(circle at 35% 35%, #ffff90,#ffc800 40%, #ff5a00 75%, #c61a00)',sz:178,gl:'inset -18px -18px 36px rgba(0,0,0,.4),0 0 60px rgba(255,200,50,.6),0 0 120px rgba(255,100,0,.3)'},
+  {n:'白矮星',bg:'radial-gradient(circle at 40% 40%, #ffffff,#dbe6ff 55%, #9bb8dd)',sz:100,gl:'inset -10px -10px 20px rgba(0,0,0,.4),0 0 44px rgba(200,220,255,.6)'},
+  {n:'中子星',bg:'radial-gradient(circle at 40% 40%, #ff5cff,#c800c8 55%, #5e005e)',sz:70,gl:'inset -8px -8px 16px rgba(0,0,0,.5),0 0 52px rgba(255,50,255,.55)'},
+  {n:'磁星',bg:'radial-gradient(circle at 40% 40%, #50ffff,#00aaff 55%, #0040aa)',sz:76,gl:'inset -8px -8px 16px rgba(0,0,0,.5),0 0 60px rgba(50,200,255,.6)'},
+  {n:'黑洞',bg:'radial-gradient(circle at 50% 50%, #000 30%, #100 55%, #000 80%)',sz:120,gl:'inset 0 0 30px rgba(180,100,255,.35),0 0 80px rgba(100,0,200,.75),0 0 140px rgba(60,0,140,.5)'}
+];
+var stageReq=[0,20,100,500,2000,10000,50000,200000,1000000,5000000,25000000];
+var cur=0;
+function applyStage(){
+  var p=document.getElementById('planet'),s=stages[cur];
+  p.style.background=s.bg;p.style.width=s.sz+'px';p.style.height=s.sz+'px';
+  p.style.boxShadow=s.gl||'inset -14px -14px 28px rgba(0,0,0,.5)';
+  document.getElementById('stage').textContent=s.n;
+}
+function checkStage(){
+  for(var i=stages.length-1;i>cur;i--)if(clicks>=stageReq[i]){cur=i;applyStage();showAch('🌌 进化为：'+stages[i].n+'！');return}
+}
+// ===== 音频 =====
+var actx=null,bgm=null,playing=false;
+function ia(){if(!actx){actx=new (window.AudioContext||window.webkitAudioContext)()}if(actx.state==='suspended')actx.resume()}
+function clickS(){if(!actx)return;var o=actx.createOscillator(),g=actx.createGain();o.connect(g);g.connect(actx.destination);o.frequency.setValueAtTime(600,actx.currentTime);o.frequency.exponentialRampToValueAtTime(900,actx.currentTime+.08);g.gain.setValueAtTime(.14,actx.currentTime);g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+.12);o.start(actx.currentTime);o.stop(actx.currentTime+.12)}
+function buyS(){if(!actx)return;var o=actx.createOscillator(),g=actx.createGain();o.connect(g);g.connect(actx.destination);o.frequency.setValueAtTime(400,actx.currentTime);o.frequency.linearRampToValueAtTime(720,actx.currentTime+.15);g.gain.setValueAtTime(.18,actx.currentTime);g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+.2);o.start(actx.currentTime);o.stop(actx.currentTime+.2)}
+function upS(){if(!actx)return;[523,659,784].forEach(function(f,i){var o=actx.createOscillator(),g=actx.createGain();o.connect(g);g.connect(actx.destination);o.frequency.value=f;g.gain.setValueAtTime(.14,actx.currentTime+i*.1);g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+i*.1+.2);o.start(actx.currentTime+i*.1);o.stop(actx.currentTime+i*.1+.2)})}
+function startBGM(){if(!actx||playing)return;playing=true;var g=actx.createGain();g.gain.value=.022;g.connect(actx.destination);var d1=actx.createOscillator();d1.type='sine';d1.frequency.value=110;d1.connect(g);d1.start();var d2=actx.createOscillator();d2.type='triangle';d2.frequency.value=165;d2.connect(g);d2.start();bgm=[d1,d2]}
+function stopBGM(){if(bgm){bgm.forEach(function(o){try{o.stop()}catch(e){}});bgm=null}playing=false}
+document.getElementById('mbtn').addEventListener('click',function(){ia();var b=document.getElementById('mbtn');if(playing){stopBGM();b.textContent='♪';b.classList.remove('playing')}else{startBGM();b.textContent='▮▮';b.classList.add('playing')}});
+// ===== 游戏数据 =====
+var dust=0,clicks=0,cp=1,dps=0;
+var buildings=[
+  {n:'🛰️ 采集卫星',d:'环绕母星的小型探测器',cost:15,m:1.15,p:1,c:0},
+  {n:'🌙 矿脉月球',d:'富含晶体的卫星',cost:120,m:1.15,p:8,c:0},
+  {n:'🪐 孵化行星',d:'正在孕育生命的世界',cost:1100,m:1.14,p:47,c:0},
+  {n:'⭐ 点亮恒星',d:'核聚变点燃的恒星',cost:12000,m:1.13,p:260,c:0},
+  {n:'🌌 星云锻造',d:'气体与尘埃的熔炉',cost:140000,m:1.12,p:1400,c:0},
+  {n:'🕳️ 微型黑洞',d:'时空扭曲的能量源',cost:1700000,m:1.11,p:7800,c:0},
+  {n:'🌠 星系列阵',d:'数千亿颗恒星的集合',cost:20000000,m:1.10,p:44000,c:0}
+];
+var upgrades=[
+  {n:'✨ 星尘共鸣',d:'点击威力 ×2',cost:200,b:false,e:function(){cp*=2}},
+  {n:'🚀 卫星阵列',d:'所有建筑产量 ×2',cost:500,b:false,e:function(){buildings.forEach(function(b){b.p*=2})}},
+  {n:'🌙 月核熔炉',d:'点击威力 ×3',cost:3000,b:false,e:function(){cp*=3}},
+  {n:'🪐 行星引力',d:'所有建筑产量 ×2',cost:8000,b:false,e:function(){buildings.forEach(function(b){b.p*=2})}},
+  {n:'⭐ 恒星风暴',d:'点击威力 ×5',cost:50000,b:false,e:function(){cp*=5}},
+  {n:'🌌 星云坍缩',d:'所有建筑产量 ×3',cost:200000,b:false,e:function(){buildings.forEach(function(b){b.p*=3})}},
+  {n:'🕳️ 奇点爆发',d:'点击威力 ×10',cost:1000000,b:false,e:function(){cp*=10}}
+];
+// ===== 工具 =====
+function fmt(n){if(n<1000)return Math.floor(n)+'';if(n<1e6)return(n/1e3).toFixed(2)+'k';if(n<1e9)return(n/1e6).toFixed(2)+'M';if(n<1e12)return(n/1e9).toFixed(2)+'B';return(n/1e12).toFixed(2)+'T'}
+function costOf(b){return Math.floor(b.cost*Math.pow(b.m,b.c))}
+// ===== 交互 =====
+function clickPlanet(ev){
+  ia();if(!playing)startBGM();
+  var g=cp*(1+buildings[0].c*.01);dust+=g;clicks++;
+  var r=document.getElementById('pwrap').getBoundingClientRect();
+  var f=document.createElement('div');f.className='ft';f.textContent='+'+fmt(g);
+  f.style.left=(ev.clientX-r.left-18)+'px';f.style.top=(ev.clientY-r.top-28)+'px';
+  document.getElementById('pwrap').appendChild(f);setTimeout(function(){f.remove()},1000);
+  clickS();checkStage();upd();
+}
+document.getElementById('pwrap').addEventListener('click',clickPlanet);
+document.getElementById('pwrap').addEventListener('touchstart',function(e){if(e.touches.length){var t=e.touches[0];clickPlanet({clientX:t.clientX,clientY:t.clientY,preventDefault:function(){}})}e.preventDefault()},{passive:false});
+function buyB(i){var b=buildings[i],c=costOf(b);if(dust>=c){ia();dust-=c;b.c++;buyS();upd();renderB();}}
+function buyU(i){var u=upgrades[i];if(!u||u.b)return;if(dust>=u.cost){ia();dust-=u.cost;u.b=true;u.e();upS();upd();renderU();}}
+// ===== 渲染 =====
+function upd(){document.getElementById('dust').textContent=fmt(dust);dps=0;buildings.forEach(function(b){dps+=b.p*b.c});document.getElementById('dps').textContent='每秒 +'+fmt(dps)}
+function renderB(){var e=document.getElementById('blist');e.innerHTML='';buildings.forEach(function(b,i){var c=costOf(b),ok=dust>=c,div=document.createElement('div');div.className='item'+(b.c>0?' owned':'');div.style.opacity=ok?1:.6;div.innerHTML='<span class="iname">'+b.n+'</span><span class="icount">×'+b.c+'</span><div class="idesc">+'+fmt(b.p)+'/秒</div><div class="icost">💫 '+fmt(c)+'</div>';div.onclick=function(){buyB(i)};e.appendChild(div)})}
+function renderU(){var e=document.getElementById('ulist');e.innerHTML='';upgrades.forEach(function(u,i){if(u.b)return;var ok=dust>=u.cost,div=document.createElement('div');div.className='item';div.style.opacity=ok?1:.6;div.innerHTML='<span class="iname">'+u.n+'</span><div class="idesc">'+u.d+'</div><div class="icost">💫 '+fmt(u.cost)+'</div>';div.onclick=function(){buyU(i)};e.appendChild(div)})}
+// ===== 成就 =====
+var achevs=[{c:function(){return clicks>=100},t:'🏆 百次点击'},{c:function(){return dust>=1000},t:'🏆 千尘归位'},{c:function(){return dust>=1e6},t:'🏆 百万星尘'},{c:function(){return cur>=6},t:'🏆 恒星诞生！'},{c:function(){return cur>=10},t:'🏆 黑洞之主！'}];
+function checkAch(){achevs.forEach(function(a){if(!a.s&&a.c()){a.s=true;showAch(a.t)}})}
+function showAch(t){var e=document.getElementById('ach');e.textContent=t;e.classList.add('show');setTimeout(function(){e.classList.remove('show')},3000)}
+// ===== 存档 =====
+function save(){var d={dust:dust,clicks:clicks,cp:cp,cur:cur,bc:buildings.map(function(b){return{b:b.n.replace(/^[^ ]+ /,'')||b.n,c:b.c,p:b.p}}),uc:upgrades.map(function(u){return{b:u.b}})};localStorage.setItem('cv_save',JSON.stringify(d))}
+function load(){var s=localStorage.getItem('cv_save');if(!s)return;try{var d=JSON.parse(s);dust=d.dust||0;clicks=d.clicks||0;cp=d.cp||1;cur=d.cur||0;if(d.bc)buildings.forEach(function(b,i){var x=d.bc[i];if(x){b.c=x.c;b.p=x.p}});if(d.uc)upgrades.forEach(function(u,i){if(d.uc[i])u.b=d.uc[i].b})}catch(e){}}}
+// ===== 启动 =====
+load();applyStage();upd();renderB();renderU();
+setInterval(function(){dust+=dps/10;upd();renderB();renderU();checkAch()},100);
+setInterval(save,5000);addEventListener('beforeunload',save);
+// 阻止微信下拉刷新
+document.addEventListener('touchmove',function(e){if(e.touches.length>1)return;e.preventDefault()},{passive:false});
+</script>
+</body>
+</html>
