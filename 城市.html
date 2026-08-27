@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>城市计划 · City Plan</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;background:#0f172a;color:#e2e8f0;height:100vh;overflow:hidden;user-select:none}
+#app{display:grid;grid-template-rows:auto 1fr;height:100vh}
+#main{display:grid;grid-template-columns:240px 1fr 290px;min-height:0}
+
+#top{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px 10px;background:#1e293b;border-bottom:1px solid #334155}
+#top .s{background:#0f172a;padding:4px 8px;border-radius:6px;border:1px solid #334155;font-size:.85em}
+#top .s b{color:#fff}
+#top .speed button{background:#475569;color:#fff;border:0;padding:4px 8px;border-radius:5px;cursor:pointer}
+#top .speed button.on{background:#2563eb}
+#top .clock{margin-left:auto;color:#94a3b8;font-size:.8em}
+
+#left{background:#111827;padding:8px;overflow-y:auto;border-right:1px solid #334155}
+#left h3{margin:8px 4px 4px;font-size:.8em;color:#94a3b8;text-transform:uppercase;letter-spacing:1px}
+.cat{margin-bottom:2px}
+.cat-title{cursor:pointer;padding:3px 5px;color:#cbd5e1;font-size:.88em}
+.cat-title:hover{color:#fff}
+.cat-body{display:grid;grid-template-columns:1fr;gap:4px;margin-bottom:4px}
+.b{min-height:48px;background:#1f2937;color:#e2e8f0;border:1px solid #374151;border-radius:6px;padding:5px 7px;cursor:pointer;text-align:left;transition:background .1s;display:flex;align-items:center;gap:6px}
+.b:hover{background:#273449}
+.b.active{background:#2563eb;border-color:#60a5fa;color:#fff;box-shadow:0 0 0 2px #60a5fa inset}
+.b .bicon{width:28px;height:28px;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.b .btext{flex:1;min-width:0}
+.b .bn{font-weight:bold;font-size:.82em}
+.b .bc{color:#fbbf24;font-size:.7em}
+.b .bi{color:#94a3b8;font-size:.62em;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.b.active .bi,.b.active .bc{color:#dbeafe}
+
+#center{position:relative;overflow:hidden;background:#0b1220}
+#viewport{width:100%;height:100%;position:relative;cursor:grab;overflow:hidden}
+#viewport.dragging{cursor:grabbing}
+#zoom-container{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
+#map{display:grid;gap:2px;background:#1f2937;padding:5px;border-radius:8px;pointer-events:none}
+.cell{width:36px;height:36px;background:#166534;border-radius:3px;cursor:pointer;position:relative;overflow:hidden;pointer-events:auto}
+.cell:hover{outline:2px solid #fbbf24;outline-offset:-2px}
+.cell.off{opacity:.5}
+.cell.selected{outline:2px solid #fbbf24;outline-offset:1px;z-index:2}
+
+svg.bicon-svg{width:28px;height:28px;pointer-events:none}
+.dur-bar{position:absolute;bottom:0;left:0;right:0;height:3px;background:rgba(0,0,0,.6)}
+.dur-fill{height:100%}
+.dur-h{background:#4ade80}.dur-m{background:#fbbf24}.dur-l{background:#f87171}
+
+#zoom-controls{position:absolute;bottom:12px;right:12px;display:flex;flex-direction:column;gap:4px;z-index:10}
+#zoom-controls button{width:32px;height:32px;border-radius:6px;border:1px solid #334155;background:#1e293b;color:#fff;font-size:16px;cursor:pointer}
+#zoom-controls button:hover{background:#334155}
+#zoom-level{text-align:center;font-size:.65em;color:#94a3b8;background:#1e293b;border-radius:3px;padding:1px 0;border:1px solid #334155}
+
+#event{position:absolute;top:12px;left:50%;transform:translateX(-50%);background:#2563eb;color:#fff;padding:6px 16px;border-radius:999px;display:none;z-index:20;font-weight:bold;font-size:.9em;box-shadow:0 4px 16px rgba(0,0,0,.4);white-space:nowrap}
+
+#building-info{position:absolute;top:12px;left:12px;background:#1e293b;border:1px solid #334155;border-radius:8px;padding:10px;width:220px;display:none;z-index:15;box-shadow:0 6px 20px rgba(0,0,0,.5)}
+#building-info h4{font-size:.9em;margin-bottom:6px;display:flex;align-items:center;gap:4px}
+#building-info .ir{display:flex;justify-content:space-between;padding:2px 0;font-size:.78em;color:#cbd5e1}
+#building-info .ir b{color:#fff}
+.badge-s{display:inline-block;padding:2px 6px;border-radius:3px;font-size:.7em;font-weight:bold;margin-top:4px}
+.badge-s.ok{background:#14532d;color:#bbf7d0}
+.badge-s.no{background:#7f1d1d;color:#fecaca}
+#building-info .close-btn{position:absolute;top:6px;right:6px;background:none;border:0;color:#94a3b8;cursor:pointer;font-size:12px}
+#building-info .close-btn:hover{color:#fff}
+.act-btn{width:100%;padding:5px 8px;border-radius:5px;border:0;cursor:pointer;font-size:.78em;font-weight:bold;margin-top:5px}
+.repair-btn{background:#2563eb;color:#fff}.repair-btn:hover{background:#1d4ed8}.repair-btn:disabled{background:#374151;color:#6b7280;cursor:not-allowed}
+.demo-btn{background:#dc2626;color:#fff}.demo-btn:hover{background:#b91c1c}
+
+#right{background:#111827;padding:8px;border-left:1px solid #334155;overflow-y:auto}
+#right h3{margin:6px 0 4px;font-size:.8em;color:#94a3b8;text-transform:uppercase;letter-spacing:1px}
+.card{background:#0f172a;border:1px solid #334155;border-radius:6px;padding:6px;margin-bottom:6px;font-size:.82em}
+.card .row{display:flex;justify-content:space-between;padding:1px 0}
+.badge{display:inline-block;padding:2px 8px;background:linear-gradient(135deg,#2563eb,#06b6d4);border-radius:8px;color:#fff;font-size:.78em;font-weight:bold}
+.ach{display:flex;flex-direction:column;gap:3px;font-size:.78em}
+.ach div{padding:3px 5px;border-radius:4px;background:#1f2937;color:#64748b}
+.ach div.done{background:#14532d;color:#bbf7d0}
+#log{background:#0f172a;border:1px solid #334155;border-radius:6px;padding:6px;height:160px;overflow-y:auto;font-size:.72em;color:#cbd5e1}
+#log div{padding:1px 0;border-bottom:1px solid rgba(255,255,255,.03)}
+
+@media(max-width:960px){#main{grid-template-columns:1fr;grid-template-rows:auto 1fr auto}#left,#right{max-height:200px}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="top">
+    <div class="s">💰 <b id="gold">1000</b></div>
+    <div class="s">👥 <b id="pop">0</b>/<span id="popcap">0</span></div>
+    <div class="s">😊 <b id="happy">50</b>%</div>
+    <div class="s">⚡ <b id="pow">0</b>/<span id="powcap">0</span></div>
+    <div class="s">💧 <b id="wat">0</b>/<span id="watcap">0</span></div>
+    <div class="s">☢️ <b id="pol">0</b></div>
+    <div class="s">🌤️ <span id="weather">☀️晴天</span></div>
+    <div class="s">🌿 <span id="season">🌸春</span></div>
+    <div class="s">🕐 <span id="gametime">第1年 1月1日 00:00</span></div>
+    <div class="s">👑 <span id="level">村庄</span></div>
+    <div class="speed"><button data-sp="1" class="on">1x</button><button data-sp="3">3x</button></div>
+    <div class="clock">⏱️ <span id="clock">0:00</span></div>
+  </div>
+  <div id="main">
+    <div id="left"></div>
+    <div id="center">
+      <div id="viewport"><div id="zoom-container"><div id="map"></div></div></div>
+      <div id="event"></div>
+      <div id="building-info"><button class="close-btn" onclick="window.closeInfo()">✕</button><h4 id="info-title"></h4><div id="info-body"></div></div>
+      <div id="zoom-controls"><button onclick="window.zoomIn()">+</button><div id="zoom-level">100%</div><button onclick="window.zoomOut()">−</button></div>
+    </div>
+    <div id="right">
+      <div class="card"><div style="font-weight:bold;color:#fbbf24;font-size:1em;margin-bottom:2px">🏙️ 城市计划</div><span class="badge" id="info-level">村庄</span></div>
+      <div class="card" id="stats"></div>
+      <h3>🏆 成就</h3><div class="ach" id="achievements"></div>
+      <h3>📋 玩法</h3>
+      <div class="card" style="font-size:.75em;line-height:1.6;color:#cbd5e1">
+        1. 先建⚡电厂+💧水厂<br>
+        2. 住宅/商业/工厂需电力+供水<br>
+        3. 公园/学校提升😊幸福<br>
+        4. 工厂☢️污染降低幸福<br>
+        5. 四季影响收入和幸福<br>
+        6. 点击建筑可修复/拆除
+      </div>
+      <h3>📜 日志</h3><div id="log"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+var GRID = 12, CELL = 36, GAP = 2, PAD = 5;
+var mapW = GRID * (CELL + GAP) + PAD * 2 - GAP;
+var mapH = mapW;
+
+var B = {
+  wood:{name:'小木屋',cat:'住宅',cost:100,pop:2,tax:2,power:1,water:1,poll:0,hap:0},
+  house:{name:'普通住宅',cat:'住宅',cost:400,pop:8,tax:6,power:2,water:2,poll:0,hap:0},
+  apt:{name:'公寓',cat:'住宅',cost:1600,pop:40,tax:26,power:4,water:4,poll:0,hap:0},
+  highrise:{name:'高楼',cat:'住宅',cost:7000,pop:175,tax:105,power:8,water:8,poll:0,hap:0},
+  sky:{name:'摩天大楼',cat:'住宅',cost:43000,pop:880,tax:445,power:21,water:21,poll:0,hap:0},
+  conv:{name:'便利店',cat:'商业',cost:400,income:8,power:2,water:1,poll:0,hap:0},
+  market:{name:'超市',cat:'商业',cost:1700,income:34,power:4,water:2,poll:0,hap:0},
+  mall:{name:'商场',cat:'商业',cost:8200,income:182,power:13,water:5,poll:2,hap:0},
+  plaza:{name:'商业中心',cat:'商业',cost:41000,income:930,power:37,water:14,poll:4,hap:0},
+  factory:{name:'小工厂',cat:'工业',cost:2300,income:85,power:17,water:4,poll:5,hap:-10},
+  bigfact:{name:'大型工厂',cat:'工业',cost:12500,income:470,power:44,water:12,poll:18,hap:-15},
+  power:{name:'小电厂',cat:'电力',cost:750,powerGen:75,poll:5},
+  bigpower:{name:'大电厂',cat:'电力',cost:8300,powerGen:870,poll:18},
+  solar:{name:'太阳能',cat:'电力',cost:4200,powerGen:245,poll:0},
+  water:{name:'水厂',cat:'供水',cost:370,waterGen:75},
+  bigwater:{name:'高级水厂',cat:'供水',cost:4200,waterGen:860},
+  park:{name:'公园',cat:'装饰',cost:230,hap:5,poll:-2},
+  school:{name:'学校',cat:'装饰',cost:1700,hap:10},
+  hospital:{name:'医院',cat:'装饰',cost:4300,hap:10},
+  police:{name:'警察局',cat:'装饰',cost:2600,hap:5},
+  fire:{name:'消防局',cat:'装饰',cost:2600,hap:5},
+  road:{name:'道路',cat:'道路',cost:35}
+};
+
+var CAT_ORDER = ['住宅','商业','工业','电力','供水','装饰','道路'];
+var LEVELS = [{name:'村庄',pop:0},{name:'小镇',pop:95},{name:'城市',pop:980},{name:'大都市',pop:9900},{name:'超级都市',pop:98000}];
+var WEATHERS = [{name:'☀️晴天',mod:1.0,hap:0},{name:'⛅多云',mod:1.0,hap:0},{name:'🌧️雨天',mod:0.895,hap:-3},{name:'⛈️暴雨',mod:0.785,hap:-8},{name:'❄️大雪',mod:0.885,hap:-5}];
+var SEASONS = [{name:'🌸春',mod:1.0,hap:2},{name:'☀️夏',mod:1.05,hap:0},{name:'🍂秋',mod:0.95,hap:-2},{name:'❄️冬',mod:0.85,hap:-5}];
+
+function iconSvg(type) {
+  switch(type) {
+    case 'wood': return '<svg class="bicon-svg" viewBox="0 0 30 30"><polygon points="15,3 28,14 2,14" fill="#8B4513"/><rect x="5" y="14" width="20" height="13" rx="1" fill="#DEB887"/><rect x="13" y="20" width="4" height="7" fill="#654321"/></svg>';
+    case 'house': return '<svg class="bicon-svg" viewBox="0 0 30 30"><polygon points="15,2 29,13 1,13" fill="#A0522D"/><rect x="4" y="13" width="22" height="15" rx="1" fill="#F5DEB3"/><rect x="3" y="5" width="5" height="5" fill="#87CEEB"/><rect x="22" y="5" width="5" height="5" fill="#87CEEB"/></svg>';
+    case 'apt': return '<svg class="bicon-svg" viewBox="0 0 30 30"><rect x="2" y="4" width="26" height="24" rx="1" fill="#C0C0C0" stroke="#999"/><rect x="4" y="6" width="5" height="5" fill="#87CEEB"/><rect x="21" y="6" width="5" height="5" fill="#87CEEB"/><rect x="4" y="16" width="5" height="5" fill="#87CEEB"/><rect x="21" y="16" width="5" height="5" fill="#87CEEB"/><rect x="12" y="22" width="6" height="6" fill="#555"/></svg>';
+    case 'highrise': return '<svg class="bicon-svg" viewBox="0 0 30 30"><rect x="4" y="2" width="22" height="27" rx="1" fill="#708090"/><rect x="4" y="8" width="22" height="3" fill="#556B2F"/><rect x="4" y="16" width="22" height="3" fill="#556B2F"/><rect x="6" y="4" width="4" height="4" fill="#87CEEB"/><rect x="20" y="4" width="4" height="4" fill="#87CEEB"/><rect x="6" y="12" width="4" height="4" fill="#87CEEB"/><rect x="20" y="12" width="4" height="4" fill="#87CEEB"/></svg>';
+    case 'sky': return '<svg class="bicon-svg" viewBox="0 0 30 30"><rect x="2" y="6" width="26" height="23" rx="2" fill="#2F4F4F"/><rect x="14" y="0" width="2" height="7" fill="#888"/><rect x="4" y="8" width="4" height="5" fill="#FFD700"/><rect x="22" y="8" width="4" height="5" fill="#FFD700"/><rect x="4" y="16" width="4" height="5" fill="#FFD700"/><rect x="22" y="16" width="4" height="5" fill="#FFD700"/><rect x="11" y="24" width="8" height="5" fill="#1a1a1a"/></svg>';
+    case 'conv': return '<svg class="bicon-svg" viewBox="0 0 30 30"><rect x="2" y="6" width="26" height="18" rx="2" fill="#FFB6C1" stroke="#DB7093"/><rect x="21" y="17" width="5" height="7" fill="#8B4513"/></svg>';
+    case 'market': return '<svg class="bicon-svg" viewBox="0 0 30 30"><rect x="1" y="5" width="28" height="22" rx="2" fill="#DDA0DD" stroke="#BA55D3"/><rect x="12" y="20" width="6" height="7" fill="#8B4513"/></svg>';
+    case 'mall': return '<svg class="bicon-svg" viewBox="0 0 30 30"><rect x="1" y="3" width="28" height="25" rx="2" fill="#4682B4" stroke="#1e90ff"/><rect x="9" y="20" width="12" height="8" fill="#1a1a1a"/></svg>';
+    case 'plaza': return '<svg class="bicon-svg" viewBox="0 0 30 30"><rect x="0" y="2" width="30" height="26" rx="3" fill="#191970" stroke="#4169E1"/><rect x="5" y="5" width="20" height="14" rx="2" fill="rgba(135,206,235,.3)"/><rect x="8" y="20" width="14" height="8" fill="#000"/></svg>';
+    case 'factory': return '<svg class="bicon-svg" viewBox="0 0 30 30"><rect x="2" y="10" width="26" height="18" rx="2" fill="#696969" stroke="#555"/><rect x="22" y="2" width="5" height="10" fill="#555"/><circle cx="23" cy="1" r="3" fill="rgba(100,100,100,.7)"/></svg>';
+    case 'bigfact': return '<svg class="bicon-svg" viewBox="0 0 30 30"><rect x="1" y="8" width="28" height="21" rx="2" fill="#555" stroke="#444"/><rect x="24" y="0" width="5" height="10" fill="#555"/><circle cx="25" cy="-1" r="3" fill="rgba(100,100,100,.7)"/></svg>';
+    case 'power': return '<svg class="bicon-svg" viewBox="0 0 30 30"><rect x="3" y="8" width="24" height="20" rx="2" fill="#8B4513" stroke="#654321"/><rect x="11" y="0" width="8" height="10" fill="#A0522D"/><rect x="8" y="10" width="14" height="3" fill="#A0522D"/></svg>';
+    case 'bigpower': return '<svg class="bicon-svg" viewBox="0 0 30 30"><rect x="2" y="6" width="26" height="23" rx="2" fill="#8B4513" stroke="#654321"/><rect x="10" y="0" width="10" height="8" fill="#A0522D"/><rect x="7" y="8" width="16" height="4" fill="#A0522D"/></svg>';
+    case 'solar': return '<svg class="bicon-svg" viewBox="0 0 30 30"><rect x="3" y="12" width="24" height="10" rx="1" fill="#1e3a5f" stroke="#4a9eff"/><rect x="14" y="22" width="2" height="6" fill="#888"/></svg>';
+    case 'water': return '<svg class="bicon-svg" viewBox="0 0 30 30"><rect x="2" y="6" width="26" height="21" rx="2" fill="#4682B4" stroke="#1e90ff"/><circle cx="15" cy="12" r="6" fill="#87CEEB" stroke="#4682B4"/><rect x="7" y="20" width="16" height="3" fill="#666" rx="1"/></svg>';
+    case 'bigwater': return '<svg class="bicon-svg" viewBox="0 0 30 30"><rect x="1" y="4" width="28" height="24" rx="2" fill="#4682B4" stroke="#1e90ff"/><circle cx="15" cy="11" r="8" fill="#87CEEB" stroke="#4682B4"/><rect x="6" y="20" width="18" height="4" fill="#666" rx="1"/></svg>';
+    case 'park': return '<svg class="bicon-svg" viewBox="0 0 30 30"><rect x="1" y="8" width="28" height="20" rx="2" fill="#228B22" stroke="#006400"/><circle cx="8" cy="12" r="5" fill="#006400"/><circle cx="22" cy="14" r="4" fill="#006400"/><circle cx="15" cy="10" r="3" fill="#228B22"/></svg>';
+    case 'school': return '<svg class="bicon-svg" viewBox="0 0 30 30"><rect x="2" y="8" width="26" height="20" rx="2" fill="#F0E68C" stroke="#DAA520"/><circle cx="15" cy="4" r="4" fill="#FFD700"/><rect x="12" y="22" width="6" height="6" fill="#8B4513"/></svg>';
+    case 'hospital': return '<svg class="bicon-svg" viewBox="0 0 30 30"><rect x="2" y="6" width="26" height="22" rx="2" fill="#F5F5DC" stroke="#DDD"/><rect x="13" y="10" width="4" height="10" fill="#DC143C"/><rect x="10" y="13" width="10" height="4" fill="#DC143C"/></svg>';
+    case 'police': return '<svg class="bicon-svg" viewBox="0 0 30 30"><rect x="3" y="6" width="24" height="21" rx="2" fill="#4169E1" stroke="#1e90ff"/><text x="15" y="20" text-anchor="middle" fill="#FFD700" font-size="12">★</text></svg>';
+    case 'fire': return '<svg class="bicon-svg" viewBox="0 0 30 30"><rect x="3" y="6" width="24" height="21" rx="2" fill="#DC143C" stroke="#B22222"/><text x="15" y="21" text-anchor="middle" fill="#FFD700" font-size="11" font-weight="bold">F</text></svg>';
+    case 'road': return '<svg class="bicon-svg" viewBox="0 0 30 30"><rect x="2" y="2" width="26" height="26" rx="2" fill="#555"/><rect x="5" y="13" width="20" height="2" fill="#fff"/></svg>';
+    default: return '';
+  }
+}
+
+var gold, population, happiness, powerCap, waterCap, pollution, popCap, income;
+var grid, achievements, selectedType, speed, tickCount, seconds, weather, season;
+var gameDay=1, gameHour=0, gameMinute=0;
+var zoom = 1, panX = 0, panY = 0;
+var isDragging = false, startX, startY, startPanX, startPanY;
+var selectedCell = null;
+var viewport = document.getElementById('viewport');
+var zoomContainer = document.getElementById('zoom-container');
+var mapEl = document.getElementById('map');
+
+function defaultState(){return{gold:1000,population:0,happiness:51,powerCap:0,waterCap:0,pollution:0,popCap:0,income:0,grid:makeGrid(),achievements:[{id:'first_house',name:'🏠 第一栋房子',done:false},{id:'pop_100',name:'👥 人口达 100',done:false},{id:'pop_1000',name:'👥 人口达 1000',done:false},{id:'pop_10000',name:'👥 人口达 10000',done:false},{id:'first_sky',name:'🏙️ 第一座摩天楼',done:false},{id:'first_factory',name:'🏭 第一个工厂',done:false},{id:'gold_1m',name:'💰 百万金币',done:false},{id:'hap_100',name:'😊 幸福度 100',done:false}],selectedType:null,speed:1,tickCount:0,seconds:0,weather:WEATHERS[0],season:SEASONS[0],gameDay:1,gameHour:0,gameMinute:0}}
+function makeGrid(){var g=[];for(var i=0;i<GRID;i++){g[i]=[];for(var j=0;j<GRID;j++)g[i][j]=null}return g}
+
+function initFromSave(){
+  var d=defaultState();var s;try{s=JSON.parse(localStorage.getItem('cityplan2'))}catch(e){}
+  if(s&&s.grid){
+    Object.assign(d,s,{
+      achievements:d.achievements.map(function(a){var f=(s.achievements||[]).find(function(x){return x.id===a.id});return f?{id:a.id,name:a.name,done:f.done}:a}),
+      weather:WEATHERS.find(function(w){return w.name===s.weatherName})||WEATHERS[0],
+      season:SEASONS.find(function(sn){return sn.name===s.seasonName})||SEASONS[0]
+    });
+    d.grid=s.grid;
+  }
+  gold=d.gold;population=d.population;happiness=d.happiness;powerCap=d.powerCap;waterCap=d.waterCap;pollution=d.pollution;popCap=d.popCap;income=d.income;grid=d.grid;achievements=d.achievements;selectedType=d.selectedType;speed=d.speed;tickCount=d.tickCount;seconds=d.seconds;weather=d.weather;season=d.season;gameDay=d.gameDay;gameHour=d.gameHour;gameMinute=d.gameMinute;
+}
+
+function fmt(n){if(n<1000)return Math.floor(n).toString();if(n<1e6)return(n/1e3).toFixed(1)+'k';if(n<1e9)return(n/1e6).toFixed(2)+'M';return(n/1e9).toFixed(2)+'B'}
+function countType(t){var c=0;for(var y=0;y<GRID;y++)for(var x=0;x<GRID;x++)if(grid[y][x]&&t.indexOf(grid[y][x].type)>=0)c++;return c}
+function log(msg){var el=document.getElementById('log');var d=document.createElement('div');d.textContent='> '+msg;el.insertBefore(d,el.firstChild);while(el.children.length>40)el.removeChild(el.lastChild)}
+function showEvent(text,good){var el=document.getElementById('event');el.textContent=text;el.style.display='block';el.style.background=good?'#16a34a':'#dc2626';clearTimeout(el._t);el._t=setTimeout(function(){el.style.display='none'},3800)}
+function getLevel(){var l=LEVELS[0];for(var i=0;i<LEVELS.length;i++)if(population>=LEVELS[i].pop)l=LEVELS[i];return l}
+
+function updateTransform(){
+  zoomContainer.style.transform = 'translate(' + panX + 'px, ' + panY + 'px) scale(' + zoom + ')';
+  document.getElementById('zoom-level').textContent = Math.round(zoom * 100) + '%';
+}
+
+function initPosition(){
+  var vw = viewport.clientWidth, vh = viewport.clientHeight;
+  panX = (vw - mapW * zoom) / 2;
+  panY = (vh - mapH * zoom) / 2;
+  updateTransform();
+}
+
+function setupDragAndZoom(){
+  viewport.addEventListener('mousedown', function(e){
+    if(e.target.closest('#building-info')||e.target.closest('#zoom-controls'))return;
+    if(e.target.classList.contains('cell')||e.target.closest('.cell'))return;
+    isDragging=true;startX=e.clientX;startY=e.clientY;startPanX=panX;startPanY=panY;
+    viewport.classList.add('dragging');
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', function(e){
+    if(!isDragging)return;
+    panX=startPanX+(e.clientX-startX);
+    panY=startPanY+(e.clientY-startY);
+    updateTransform();
+  });
+
+  document.addEventListener('mouseup', function(){
+    if(!isDragging)return;isDragging=false;viewport.classList.remove('dragging');
+  });
+
+  viewport.addEventListener('wheel', function(e){
+    e.preventDefault();
+    var delta = e.deltaY > 0 ? 0.9 : 1.1;
+    zoom = Math.max(0.3, Math.min(3, zoom * delta));
+    updateTransform();
+  }, {passive:false});
+}
+
+window.zoomIn=function(){zoom=Math.min(3,zoom+0.15);updateTransform()};
+window.zoomOut=function(){zoom=Math.max(0.3,zoom-0.15);updateTransform()};
+
+window.closeInfo=function(){selectedCell=null;document.getElementById('building-info').style.display='none';renderMap()};
+
+window.repair=function(x,y){
+  var c=grid[y][x];if(!c)return;
+  var def=B[c.type];var rc=Math.ceil((100-c.durability)*def.cost/500);
+  if(gold<rc){log('❌ 金币不足');return;}
+  gold-=rc;c.durability=Math.min(100,c.durability+40);
+  log('🔧 修复了 '+def.name);calcCity();renderAll();showInfo(x,y);
+};
+
+window.demolish=function(x,y){
+  var c=grid[y][x];if(!c)return;
+  var def=B[c.type];gold+=Math.floor(def.cost*0.2);grid[y][x]=null;
+  log('🧨 拆除 '+def.name);window.closeInfo();calcCity();renderAll();
+};
+
+function showInfo(x,y){
+  var c=grid[y][x];if(!c){window.closeInfo();return}
+  selectedCell={x:x,y:y};
+  var def=B[c.type];
+  document.getElementById('info-title').innerHTML=iconSvg(c.type)+' '+def.name;
+  var h='';
+  h+='<div class="ir"><span>类别</span><b>'+def.cat+'</b></div>';
+  h+='<div class="ir"><span>耐久</span><b>'+Math.round(c.durability)+'/100</b></div>';
+  h+='<div class="dur-bar"><div class="dur-fill '+(c.durability>66?'dur-h':c.durability>33?'dur-m':'dur-l')+'" style="width:'+c.durability+'%"></div></div>';
+  h+='<div class="ir" style="margin-top:4px"><span>建造成本</span><b>💰'+def.cost+'</b></div>';
+  if(def.pop)h+='<div class="ir"><span>人口</span><b>👥+'+def.pop+'</b></div>';
+  if(def.tax)h+='<div class="ir"><span>税收</span><b>💰+'+def.tax+'/s</b></div>';
+  if(def.income)h+='<div class="ir"><span>收入</span><b>💰+'+def.income+'/s</b></div>';
+  if(def.powerGen)h+='<div class="ir"><span>发电</span><b>⚡+'+def.powerGen+'</b></div>';
+  if(def.waterGen)h+='<div class="ir"><span>供水</span><b>💧+'+def.waterGen+'</b></div>';
+  if(def.power)h+='<div class="ir"><span>耗电</span><b>⚡'+def.power+'</b></div>';
+  if(def.water)h+='<div class="ir"><span>耗水</span><b>💧'+def.water+'</b></div>';
+  if(def.hap)h+='<div class="ir"><span>幸福</span><b style="color:'+(def.hap>0?'#4ade80':'#f87171')+'">'+(def.hap>0?'+':'')+def.hap+'</b></div>';
+  if(def.poll)h+='<div class="ir"><span>污染</span><b style="color:#f87171">+'+def.poll+'</b></div>';
+  h+='<span class="badge-s '+(c.active?'ok':'no')+'">'+(c.active?'✓ 正常运作':'✗ 停止运作')+'</span>';
+  if(c.durability<100){var rc=Math.ceil((100-c.durability)*def.cost/500);h+='<button class="act-btn repair-btn" '+(gold<rc?'disabled':'')+' onclick="window.repair('+x+','+y+')">🔧 修复 (💰'+rc+')</button>'}
+  h+='<button class="act-btn demo-btn" onclick="window.demolish('+x+','+y+')">🧨 拆除 (返还 💰'+Math.floor(def.cost*0.2)+')</button>';
+  document.getElementById('info-body').innerHTML=h;
+  document.getElementById('building-info').style.display='block';
+  renderMap();
+}
+
+function calcCity(){
+  var pwr=0,wtr=0,pol=0,hapD=0;
+  for(var y=0;y<GRID;y++)for(var x=0;x<GRID;x++){var c=grid[y][x];if(!c)continue;var b=B[c.type];if(b.powerGen)pwr+=b.powerGen;if(b.waterGen)wtr+=b.waterGen;if(b.poll)pol+=b.poll;if(b.hap)hapD+=b.hap}
+  powerCap=pwr;waterCap=wtr;pollution=Math.min(100,pol);
+  var hp=powerCap>0,hw=waterCap>0;
+  var tS=0,iS=0,pS=0;
+  for(var y=0;y<GRID;y++)for(var x=0;x<GRID;x++){var c=grid[y][x];if(!c)continue;var b=B[c.type];var nd=!!(b.tax||b.income||b.pop);var wk=!nd||(hp&&hw);c.active=wk&&c.durability>0;if(!c.active)continue;var df=c.durability/100;if(b.tax)tS+=b.tax*df;if(b.income)iS+=b.income*df;if(b.pop)pS+=b.pop*df}
+  popCap=pS;
+  var hap=50+hapD+season.hap;
+  if(pollution>30)hap-=Math.floor((pollution-29)/5)*3;
+  if(!hp&&countType(['power','solar','bigpower'])>0)hap-=30;
+  if(pollution>=80)hap-=20;
+  happiness=Math.max(0,Math.min(100,hap));population=Math.floor(popCap*(happiness/100));
+  var hm=0.52+(happiness/100)*0.49;income=(iS+tS)*weather.mod*season.mod*hm;
+}
+
+function tick(){
+  tickCount++;seconds++;
+  gameMinute+=10;
+  while(gameMinute>=60){gameMinute-=60;gameHour++}
+  while(gameHour>=24){gameHour-=24;gameDay++}
+  gold+=income;
+  if(tickCount%6===0)changeWeather();
+  if(tickCount%44===0)randomEvent();
+  if(tickCount%120===0){season=SEASONS[(SEASONS.indexOf(season)+1)%4];document.getElementById('season').textContent=season.name;showEvent('季节变换：'+season.name,true)}
+  checkAchievements();calcCity();renderTop();renderStats();if(tickCount%5===0)renderMap();save();
+}
+
+function gameLoop(){for(var i=0;i<speed;i++)tick();renderTop();renderStats()}
+
+function changeWeather(){var w=WEATHERS[Math.floor(Math.random()*WEATHERS.length)];if(w.name===weather.name&&Math.random()<0.56)return;weather=w;if(w.hap)happiness=Math.max(0,Math.min(100,happiness+w.hap));document.getElementById('weather').textContent=w.name}
+
+function randomEvent(){
+  var events=[
+    {name:'🎉 音乐节！收入+20%',good:true,fn:function(){gold+=Math.floor(income*2)+220;log('🎉 音乐节！')}},
+    {name:'🔥 火灾！建筑受损',good:false,fn:function(){var o=[];for(var y=0;y<GRID;y++)for(var x=0;x<GRID;x++)if(grid[y][x])o.push({x:x,y:y});if(o.length){var p=o[Math.floor(Math.random()*o.length)];var c=grid[p.y][p.x];c.durability=Math.max(0,c.durability-30);log('🔥 '+B[c.type].name+' 受损');if(selectedCell&&selectedCell.x===p.x&&selectedCell.y===p.y)showInfo(p.x,p.y)}}},
+    {name:'👾 外星人！+5000金',good:true,fn:function(){gold+=5000;log('👾 外星人！')}},
+    {name:'💰 投资！',good:true,fn:function(){gold+=2000+Math.floor(population/2);log('💰 投资！')}},
+    {name:'☣️ 污染爆发！',good:false,fn:function(){pollution=Math.min(100,pollution+15);happiness=Math.max(0,happiness-10);log('☣️ 污染！')}},
+    {name:'🎓 人才涌入！',good:true,fn:function(){log('🎓 人才！')}}
+  ];
+  var e=events[Math.floor(Math.random()*events.length)];showEvent(e.name,e.good);e.fn();
+}
+
+function checkAchievements(){
+  var set=function(id,c){var x=achievements.find(function(z){return z.id===id});if(x&&!x.done&&c){x.done=true;showEvent('🏆 '+x.name,true);log('🏆 '+x.name);renderAch()}};
+  set('first_house',countType(['wood','house','apt','highrise','sky'])>0);set('first_sky',countType(['sky'])>0);set('first_factory',countType(['factory','bigfact'])>0);set('pop_100',population>=100);set('pop_1000',population>=995);set('pop_10000',population>=9980);set('gold_1m',gold>=1e6);set('hap_100',happiness>=99);
+}
+
+function selectType(t){selectedType=t;window.closeInfo();renderMenu();renderMap()}
+function onCellClick(x,y){
+  var c=grid[y][x];
+  if(c){if(selectedCell&&selectedCell.x===x&&selectedCell.y===y)window.closeInfo();else showInfo(x,y);return}
+  window.closeInfo();
+  if(!selectedType){log('⚠️ 请先选择建筑');return}
+  var def=B[selectedType];
+  if(gold<def.cost){log('❌ 金币不足');return}
+  gold-=def.cost;grid[y][x]={type:selectedType,active:true,durability:100};log('✅ 建造 '+def.name);
+  if(def.cat!=='道路')selectedType=null;calcCity();renderAll();
+}
+
+function renderMenu(){
+  var l=document.getElementById('left');l.innerHTML='<h3>🔨 建造菜单</h3>';
+  for(var ci=0;ci<CAT_ORDER.length;ci++){var cat=CAT_ORDER[ci];
+    var w=document.createElement('div');w.className='cat';
+    var t=document.createElement('div');t.className='cat-title';t.textContent='▸ '+cat;
+    var b=document.createElement('div');b.className='cat-body';
+    var keys=Object.keys(B);
+    for(var ki=0;ki<keys.length;ki++){var k=keys[ki],def=B[k];if(def.cat!==cat)continue;
+      var btn=document.createElement('div');btn.className='b'+(selectedType===k?' active':'');btn.onclick=function(kk){return function(){selectType(kk)}}(k);
+      var info='';if(def.pop)info+='👥+'+def.pop+' ';if(def.tax)info+='💰+'+def.tax+' ';if(def.income)info+='💰+'+def.income+' ';if(def.powerGen)info+='⚡+'+def.powerGen+' ';if(def.waterGen)info+='💧+'+def.waterGen+' ';if(def.hap)info+='😊+'+(def.hap>0?'+':'')+def.hap+' ';if(def.poll)info+='☢️+'+def.poll;
+      btn.innerHTML='<div class="bicon">'+iconSvg(k)+'</div><div class="btext"><div class="bn">'+def.name+'</div><div class="bc">💰 '+def.cost+'</div><div class="bi">'+info+'</div></div>';
+      b.appendChild(btn);
+    }
+    w.appendChild(t);w.appendChild(b);l.appendChild(w);
+  }
+}
+
+function renderMap(){
+  if(mapEl.children.length!==GRID*GRID){
+    mapEl.innerHTML='';mapEl.style.gridTemplateColumns='repeat('+GRID+',1fr)';
+    for(var y=0;y<GRID;y++)for(var x=0;x<GRID;x++){
+      var d=document.createElement('div');d.className='cell empty';
+      (function(xx,yy){d.onclick=function(){onCellClick(xx,yy)}})(x,y);
+      mapEl.appendChild(d);
+    }
+  }
+  var cells=mapEl.children;
+  for(var y=0;y<GRID;y++)for(var x=0;x<GRID;x++){
+    var d=cells[y*GRID+x];var c=grid[y][x];
+    if(c){d.className='cell'+(c.active?'':' off');
+      var html='<div style="display:flex;align-items:center;justify-content:center;width:100%;height:100%">'+iconSvg(c.type)+'</div>';
+      if(c.durability<100)html+='<div class="dur-bar"><div class="dur-fill '+(c.durability>66?'dur-h':c.durability>33?'dur-m':'dur-l')+'" style="width:'+c.durability+'%"></div></div>';
+      d.innerHTML=html;
+      if(selectedCell&&selectedCell.x===x&&selectedCell.y===y)d.classList.add('selected');
+    }else{d.className='cell empty';d.innerHTML=''}
+  }
+}
+
+function renderTop(){
+  document.getElementById('gold').textContent=fmt(gold);document.getElementById('pop').textContent=fmt(population);document.getElementById('popcap').textContent=fmt(popCap);document.getElementById('happy').textContent=Math.round(happiness);document.getElementById('pow').textContent=Math.round(powerCap);document.getElementById('powcap').textContent=Math.round(powerCap);document.getElementById('wat').textContent=Math.round(waterCap);document.getElementById('watcap').textContent=Math.round(waterCap);document.getElementById('pol').textContent=Math.round(pollution);document.getElementById('level').textContent=getLevel().name;document.getElementById('clock').textContent=Math.floor(seconds/60)+':'+String(seconds%60).padStart(2,'0');
+  var mo=Math.floor((gameDay-1)/30)+1,da=((gameDay-1)%30)+1;
+  document.getElementById('gametime').textContent='第'+Math.ceil(gameDay/360)+'年 '+mo+'月'+da+'日 '+String(gameHour).padStart(2,'0')+':'+String(gameMinute).padStart(2,'0');
+}
+function renderStats(){document.getElementById('stats').innerHTML='<div class="row"><span>收入/秒</span><b style="color:#4ade80">+'+fmt(income)+'</b></div><div class="row"><span>人口上限</span><b>'+fmt(popCap)+'</b></div><div class="row"><span>幸福度</span><b style="color:'+(happiness>=70?'#4ade80':happiness>=40?'#fbbf24':'#f87171')+'">'+Math.round(happiness)+'%</b></div><div class="row"><span>污染</span><b style="color:'+(pollution>62?'#f87171':'#cbd5e1')+'">'+Math.round(pollution)+'%</b></div>';document.getElementById('info-level').textContent=getLevel().name}
+function renderAch(){document.getElementById('achievements').innerHTML=achievements.map(function(a){return'<div class="'+(a.done?'done':'')+'">'+(a.done?'✓':'○')+' '+a.name+'</div>'}).join('')}
+function renderAll(){renderMenu();renderMap();renderTop();renderStats();renderAch()}
+
+function save(){var dt={gold:gold,population:population,happiness:happiness,powerCap:powerCap,waterCap:waterCap,pollution:pollution,popCap:popCap,income:income,seconds:seconds,tickCount:tickCount,weatherName:weather.name,seasonName:season.name,speed:speed,selectedType:selectedType,grid:grid,gameDay:gameDay,gameHour:gameHour,gameMinute:gameMinute,achievements:achievements.map(function(a){return{id:a.id,done:a.done}})};try{localStorage.setItem('cityplan2',JSON.stringify(dt))}catch(e){}}
+
+function bind(){
+  document.querySelectorAll('.speed button').forEach(function(b){b.addEventListener('click',function(){document.querySelectorAll('.speed button').forEach(function(x){x.classList.remove('on')});b.classList.add('on');speed=parseInt(b.dataset.sp)})});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'){selectedType=null;window.closeInfo();renderMenu();renderMap()}});
+  document.getElementById('left').addEventListener('click',function(e){if(e.target.classList.contains('cat-title')){var body=e.target.nextElementSibling;if(body){body.style.display=(body.style.display==='none'?'':'none');e.target.textContent=(body.style.display==='none'?'▸ ':'▾ ')+e.target.textContent.slice(2)}}});
+  document.getElementById('viewport').addEventListener('click',function(e){if(e.target.id==='viewport'||e.target.id==='zoom-container')window.closeInfo()});
+}
+
+initFromSave();calcCity();bind();setupDragAndZoom();initPosition();renderAll();log('🎮 城市计划启动！先建 ⚡电厂 和 💧水厂');checkAchievements();setInterval(gameLoop,1000);
+
+})();
+</script>
+</body>
+</html>
